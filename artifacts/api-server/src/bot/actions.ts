@@ -109,16 +109,45 @@ const SELF_TEXT: Record<string, (author: string) => string> = {
 const SELF_ACTIONS = new Set(["cry", "laugh", "angry", "blush", "dance"]);
 
 async function fetchGif(action: string): Promise<string | null> {
-  try {
-    const category = GIF_CATEGORY[action] ?? action;
-    const resp = await fetch(`https://nekos.best/api/v2/${category}`);
-    if (!resp.ok) return null;
-    const data = (await resp.json()) as { results: { url: string }[] };
-    return data.results[0]?.url ?? null;
-  } catch (err) {
-    logger.error({ err, action }, "Failed to fetch anime gif");
-    return null;
+  const requestedCategory = GIF_CATEGORY[action] ?? action;
+  const categoryFallbacks: Record<string, string> = {
+    angry: "slap",
+    bonk: "slap",
+  };
+  const categories = [
+    requestedCategory,
+    categoryFallbacks[requestedCategory],
+  ].filter((category, index, all): category is string =>
+    Boolean(category) && all.indexOf(category) === index,
+  );
+
+  for (const category of categories) {
+    const endpoints = [
+      `https://api.otakugifs.xyz/gif?reaction=${encodeURIComponent(category)}`,
+      `https://nekos.life/api/v2/img/${encodeURIComponent(category)}`,
+    ];
+
+    for (const endpoint of endpoints) {
+      try {
+        const resp = await fetch(endpoint, {
+          signal: AbortSignal.timeout(8_000),
+        });
+        if (!resp.ok) continue;
+
+        const data = (await resp.json()) as {
+          url?: string;
+          results?: { url?: string }[];
+        };
+        const url = data.url ?? data.results?.[0]?.url;
+        if (url) return url;
+      } catch (err) {
+        logger.warn({ err, action, endpoint }, "GIF provider request failed");
+      }
+    }
   }
+
+  logger.warn({ action }, "No GIF was available for action");
+  return null;
 }
 
 function buildEmbed(text: string, gifUrl: string | null, color: number): EmbedBuilder {
