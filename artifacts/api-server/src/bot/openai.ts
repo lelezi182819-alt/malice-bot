@@ -11,6 +11,7 @@ const groq = new OpenAI({
   apiKey,
   baseURL: "https://api.groq.com/openai/v1",
 });
+const model = process.env["GROQ_MODEL"] ?? "openai/gpt-oss-20b";
 
 const SYSTEM_PROMPT = `You are Malice, a cheerful, energetic, and polite Brazilian girl living in a foreign server. You have a big heart and love talking to people!
 
@@ -40,7 +41,7 @@ Stay in character at all times. You are Malice, not an AI assistant.`;
 export async function getOneShotResponse(prompt: string): Promise<string> {
   try {
     const response = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: prompt },
@@ -69,7 +70,7 @@ export async function getAIResponse(
     ];
 
     const response = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
+      model,
       messages,
       max_tokens: 1500,
     });
